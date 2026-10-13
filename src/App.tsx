@@ -565,7 +565,7 @@ export default function App() {
         <div className="ledger-layout">
           <header className="topbar">
             <div className="brand-lockup">
-              <div className="mark small" aria-hidden="true">₺</div>
+              <img className="mark small brand-mark-image" src="https://i.hizliresim.com/3jbtlkgx.png" alt="" aria-hidden="true" />
               <div><p className="eyebrow">TOPLULUK YÖNETİMİ</p><h1>Topluluk Bütçesi</h1></div>
             </div>
             <div className="account-menu"><span title={user.email ?? undefined}>{user.email}</span><button className="button settings-button" type="button" onClick={openSettings}>Ayarlar</button><button className="button logout-button" onClick={handleSignOut} disabled={busy}>Çıkış</button></div>
