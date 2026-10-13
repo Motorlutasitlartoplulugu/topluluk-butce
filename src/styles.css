@@ -18,10 +18,22 @@ button, input, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid rgba(69, 121, 93, .34); outline-offset: 2px; }
 
 .page-shell {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   padding: 28px 20px 46px;
   background: radial-gradient(ellipse at 12% 8%, rgba(206, 219, 199, .55), transparent 34%), radial-gradient(ellipse at 91% 90%, rgba(231, 219, 191, .5), transparent 31%), #f5f4ef;
 }
+.page-shell::before {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  background: url("./assets/topluluk-arka-plan.png") center / cover no-repeat;
+  content: "";
+  opacity: .18;
+  pointer-events: none;
+}
+.page-shell > * { position: relative; z-index: 1; }
 .auth-card {
   width: min(100%, 440px);
   margin: max(8vh, 28px) auto;
@@ -164,6 +176,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 
 @media (max-width: 760px) {
   .page-shell { padding: 18px 13px 32px; }
+  .page-shell::before { opacity: .1; }
   .content-grid { grid-template-columns: 1fr; }
   .history-panel { min-height: 320px; }
   .audit-panel { padding: 17px 15px; }
