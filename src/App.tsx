@@ -534,7 +534,7 @@ export default function App() {
       {!user ? (
         <section className="auth-card" aria-labelledby="page-title">
           <div className="mark" aria-hidden="true">₺</div>
-          <p className="eyebrow">TOPLULUK YÖNETİMİ</p>
+          <p className="eyebrow">MOTORLU TAŞITLAR TOPLULUĞU</p>
           <h1 id="page-title">Topluluk Bütçesi</h1>
           <p className="intro">{authMode === "signin" ? "Gelir ve gider kayıtlarına ulaşmak için hesabınızla giriş yapın." : "Yeni bir hesap oluşturun. Kasa kayıtlarına erişim yönetici onayı gerektirir."}</p>
 
@@ -566,7 +566,7 @@ export default function App() {
           <header className="topbar">
             <div className="brand-lockup">
               <img className="mark small brand-mark-image" src="https://i.hizliresim.com/3jbtlkgx.png" alt="" aria-hidden="true" />
-              <div><p className="eyebrow">TOPLULUK YÖNETİMİ</p><h1>Topluluk Bütçesi</h1></div>
+              <div><p className="eyebrow">MOTORLU TAŞITLAR TOPLULUĞU</p><h1>Topluluk Bütçesi</h1></div>
             </div>
             <div className="account-menu"><span title={user.email ?? undefined}>{user.email}</span><button className="button settings-button" type="button" onClick={openSettings}>Ayarlar</button><button className="button logout-button" onClick={handleSignOut} disabled={busy}>Çıkış</button></div>
           </header>
@@ -583,7 +583,6 @@ export default function App() {
           ) : (
             <>
               <section className="welcome-row">
-                <div><p className="eyebrow">ORTAK KASA</p><h2>Hesap hareketleri</h2><p className="muted">Gelirleri ve giderleri tek yerden takip edin.</p></div>
                 <div className="welcome-actions">
                   <button className="mobile-entry-toggle" type="button" onClick={() => setMobileEntryOpen(true)} aria-label="Gelir veya gider kaydı aç">
                     <span className="hamburger-icon" aria-hidden="true"><i /><i /><i /></span><span>Kayıt ekle</span>
@@ -632,7 +631,7 @@ export default function App() {
                 </section>
 
                 <section className="panel history-panel" aria-labelledby="history-title">
-                  <div className="panel-heading history-heading"><div><p className="eyebrow">ORTAK KASA</p><h2 id="history-title">Son hareketler</h2></div><span className="secure-label"><span /> Özel kayıtlar</span></div>
+                  <div className="panel-heading history-heading"><div><h2 id="history-title">Son hareketler</h2></div><span className="secure-label"><span /> Özel kayıtlar</span></div>
                   {message && <p className="message history-message" role="status">{message}</p>}
                   {entries.length === 0 ? (
                     <div className="empty-state"><div className="empty-icon" aria-hidden="true">↗</div><h3>Henüz kayıt yok</h3><p>İlk gelir veya gider hareketini eklediğinizde burada görünecek.</p></div>
