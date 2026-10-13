@@ -95,7 +95,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .text-button { min-height: 34px; padding: 6px 10px; border: 1px solid #84988b; border-radius: 8px; background: rgba(248, 250, 246, .94); color: #20392d; font-size: 12px; font-weight: 750; box-shadow: 0 1px 3px rgba(24, 43, 32, .12); cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s; }
 .text-button:hover { border-color: #496653; background: #eaf0e8; box-shadow: 0 2px 5px rgba(24, 43, 32, .17); }
 .welcome-row { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 29px 0 19px; }
-.welcome-actions { display: flex; align-items: center; gap: 14px; }
+.welcome-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; }
 .mobile-entry-toggle, .mobile-entry-backdrop, .mobile-entry-close { display: none; }
 .hamburger-icon { display: grid; gap: 4px; width: 18px; }
 .hamburger-icon i { display: block; height: 2px; border-radius: 2px; background: currentColor; }
