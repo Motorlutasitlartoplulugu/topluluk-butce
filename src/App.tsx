@@ -82,6 +82,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [settingsPasswordConfigured, setSettingsPasswordConfigured] = useState<boolean | null>(null);
+  const [settingsResetMode, setSettingsResetMode] = useState(false);
+  const [accountPassword, setAccountPassword] = useState("");
   const [settingsPassphrase, setSettingsPassphrase] = useState("");
   const [settingsConfirmPassphrase, setSettingsConfirmPassphrase] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
@@ -263,6 +265,7 @@ export default function App() {
     setSettingsUnlocked(false);
     setSettingsPassphrase("");
     setSettingsConfirmPassphrase("");
+    setAccountPassword("");
     setBusy(true);
     const { error } = await supabase.auth.signOut();
     setMessage(error ? "Oturum kapatılamadı. Yeniden deneyin." : "");
@@ -272,8 +275,10 @@ export default function App() {
   async function openSettings() {
     setSettingsOpen(true);
     setSettingsUnlocked(false);
+    setSettingsResetMode(false);
     setSettingsPassphrase("");
     setSettingsConfirmPassphrase("");
+    setAccountPassword("");
     setSettingsPasswordConfigured(null);
     setSettingsMessage("");
     if (!supabase) return;
@@ -316,6 +321,38 @@ export default function App() {
     }
     setSettingsUnlocked(true);
     setSettingsMessage("");
+  }
+
+  async function resetSettingsPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user?.email) return;
+    if (settingsPassphrase.length < 12 || settingsPassphrase.length > 128) {
+      setSettingsMessage("Yeni şifre 12–128 karakter olmalı.");
+      return;
+    }
+    if (settingsPassphrase !== settingsConfirmPassphrase) {
+      setSettingsMessage("Yeni şifreler eşleşmiyor.");
+      return;
+    }
+    setBusy(true);
+    setSettingsMessage("");
+    const { error: authError } = await supabase.auth.signInWithPassword({ email: user.email, password: accountPassword });
+    if (authError) {
+      setBusy(false);
+      setSettingsMessage("Hesap şifresi doğrulanamadı.");
+      return;
+    }
+    const { error } = await supabase.rpc("reset_ledger_settings_password", { p_password: settingsPassphrase });
+    setBusy(false);
+    if (error) {
+      setSettingsMessage("Yeni ayar şifresi kaydedilemedi.");
+      return;
+    }
+    setSettingsUnlocked(true);
+    setSettingsResetMode(false);
+    setAccountPassword("");
+    setSettingsConfirmPassphrase("");
+    setSettingsMessage("Ayar şifresi yenilendi.");
   }
 
   function handleBackgroundChange(file: File | undefined) {
@@ -629,8 +666,8 @@ export default function App() {
               <p className="privacy-note"><span aria-hidden="true">◈</span> Kasa kayıtları ve fiş görselleri yalnızca yetkilendirilmiş hesaplara açıktır.</p>
               {settingsOpen && <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
                 <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-                  <div className="panel-heading"><div><p className="eyebrow">TERCİHLER VE YÖNETİM</p><h2 id="settings-title">Ayarlar</h2></div><button className="icon-button" type="button" aria-label="Ayarları kapat" onClick={() => { setSettingsOpen(false); setSettingsPassphrase(""); setSettingsConfirmPassphrase(""); }}>×</button></div>
-                  {settingsPasswordConfigured === null ? <p className="status" role="status">Ayarlar doğrulanıyor…</p> : !settingsUnlocked ? <form className="settings-form" onSubmit={unlockSettings}><p className="muted">{settingsPasswordConfigured ? "Ayarları açmak için şifrenizi girin." : "İlk kullanım: kendinize özel yeni bir ayar şifresi oluşturun."}</p><label htmlFor="settings-password">{settingsPasswordConfigured ? "Ayar şifresi" : "Yeni ayar şifresi (en az 12 karakter)"}</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} minLength={settingsPasswordConfigured ? undefined : 12} maxLength={128} autoComplete={settingsPasswordConfigured ? "current-password" : "new-password"} required />{!settingsPasswordConfigured && <><label htmlFor="settings-password-confirm">Şifreyi tekrar girin</label><input id="settings-password-confirm" type="password" value={settingsConfirmPassphrase} onChange={(event) => setSettingsConfirmPassphrase(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /></>}<button className="button" type="submit">{settingsPasswordConfigured ? "Ayarları aç" : "Şifreyi kaydet ve aç"}</button></form> : <div className="settings-content">
+                  <div className="panel-heading"><div><p className="eyebrow">TERCİHLER VE YÖNETİM</p><h2 id="settings-title">Ayarlar</h2></div><button className="icon-button" type="button" aria-label="Ayarları kapat" onClick={() => { setSettingsOpen(false); setSettingsPassphrase(""); setSettingsConfirmPassphrase(""); setAccountPassword(""); }}>×</button></div>
+                  {settingsPasswordConfigured === null ? <p className="status" role="status">Ayarlar doğrulanıyor…</p> : !settingsUnlocked && settingsPasswordConfigured && !settingsResetMode ? <><form className="settings-form" onSubmit={unlockSettings}><p className="muted">Ayarları açmak için şifrenizi girin.</p><label htmlFor="settings-password">Ayar şifresi</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} maxLength={128} autoComplete="current-password" required /><button className="button" type="submit">Ayarları aç</button></form><button className="text-button reset-password-button" type="button" onClick={() => { setSettingsResetMode(true); setSettingsMessage(""); }}>Ayar şifresini yenile</button></> : !settingsUnlocked ? <form className="settings-form" onSubmit={settingsResetMode ? resetSettingsPassword : unlockSettings}><p className="muted">{settingsResetMode ? "Hesap şifreni tekrar doğrula ve yeni ayar şifresi belirle." : "İlk kullanım: kendine özel bir ayar şifresi oluştur."}</p>{settingsResetMode && <><label htmlFor="account-password">Hesap şifresi</label><input id="account-password" type="password" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} autoComplete="current-password" required /></>}<label htmlFor="settings-password">Yeni ayar şifresi (en az 12 karakter)</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /><label htmlFor="settings-password-confirm">Şifreyi tekrar girin</label><input id="settings-password-confirm" type="password" value={settingsConfirmPassphrase} onChange={(event) => setSettingsConfirmPassphrase(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /><button className="button" type="submit" disabled={busy}>{busy ? "Kaydediliyor…" : settingsResetMode ? "Şifreyi doğrula ve yenile" : "Şifreyi kaydet ve aç"}</button></form> : <div className="settings-content">
                     <section className="settings-section"><h3>Arka plan</h3><p>Yeni bir görsel seçin. Seçim bu tarayıcıda saklanır.</p><label className="button settings-action" htmlFor="background-file">Arka planı değiştir<input id="background-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleBackgroundChange(event.currentTarget.files?.[0])} /></label>{backgroundImage && <button className="button secondary settings-action" type="button" onClick={resetBackground}>Varsayılan arka plana dön</button>}</section>
                     <section className="settings-section danger-zone"><h3>Kasa kayıtlarını sil</h3><p>Tüm gelir ve gider kayıtları silinir. İşlem geçmişinde silme işlemi ve yapan kişinin adı kalır.</p><label htmlFor="delete-actor-name">İşlemi yapan kişi</label><input id="delete-actor-name" value={deleteActorName} onChange={(event) => setDeleteActorName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" /><button className="button danger-button" type="button" onClick={deleteAllEntries} disabled={busy || entries.length === 0}>{busy ? "Siliniyor…" : `Tüm kayıtları sil (${entries.length})`}</button></section>
                   </div>}
