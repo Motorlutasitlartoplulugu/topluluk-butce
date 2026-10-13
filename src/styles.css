@@ -99,7 +99,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .muted { margin: 0; color: #78827a; font-size: 13px; }
 .entry-count { padding-bottom: 3px; color: #315c49; font-family: "Manrope", sans-serif; font-size: 20px; font-weight: 800; }
 .entry-count span { color: #8a948c; font-family: "DM Sans", sans-serif; font-size: 12px; font-weight: 500; }
-.summary-grid { display: grid; grid-template-columns: 1fr 1.45fr 1fr; gap: 13px; }
+.summary-grid { display: grid; grid-template-columns: minmax(0, 1fr) 375px minmax(0, 1fr); gap: 13px; }
 .summary-card { min-height: 117px; padding: 17px 19px; border: 1px solid #e2e5dc; border-radius: 14px; background: rgba(255,255,252,.87); }
 .summary-card span { display: block; margin-bottom: 9px; color: #738076; font-size: 12px; }
 .summary-card strong { display: block; color: #23382d; font-family: "Manrope", sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.035em; }
@@ -219,6 +219,9 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .empty-state { padding: 58px 24px; }
   .summary-card { padding: 15px; }
   .summary-card strong { font-size: 19px; }
+}
+@media (max-width: 900px) and (min-width: 501px) {
+  .summary-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 40vw) minmax(0, 1fr); }
 }
 @media (max-width: 500px) {
   .auth-card { padding: 34px 25px 24px; }
