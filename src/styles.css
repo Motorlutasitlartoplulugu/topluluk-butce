@@ -86,7 +86,9 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .brand-lockup { display: flex; align-items: center; gap: 13px; }
 .brand-lockup .eyebrow { margin-bottom: 2px; font-size: 9px; }
 .brand-lockup h1 { font-size: 18px; letter-spacing: -.03em; }
-.account-menu { display: flex; align-items: center; gap: 17px; min-width: 0; color: #68746b; font-size: 12px; }
+.account-menu { position: relative; display: flex; align-items: center; gap: 17px; min-width: 0; color: #68746b; font-size: 12px; }
+.account-actions { display: flex; align-items: center; gap: 17px; }
+.mobile-account-toggle, .mobile-account-email, .mobile-account-backdrop { display: none; }
 .account-menu .button { min-height: 38px; margin: 0; padding: 0 14px; font-size: 12px; }
 .settings-button { background: #243a31; }
 .settings-button:hover:not(:disabled), .logout-button:hover:not(:disabled) { background: #14271f; }
@@ -164,6 +166,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .entry-amount { padding-left: 7px; font-family: "Manrope", sans-serif; font-size: 12px; white-space: nowrap; }
 .entry-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .edit-button { padding: 6px 10px; border: 1px solid #14271f; border-radius: 8px; background: #243a31; color: #fff; font-size: 11px; font-weight: 750; box-shadow: 0 2px 4px rgba(18, 39, 29, .18); cursor: pointer; }
+.edit-button-icon { display: none; }
 .edit-button:hover:not(:disabled) { border-color: #b9cbbd; background: #edf3ec; }
 .edit-button:disabled { opacity: .6; cursor: wait; }
 .edit-button:hover:not(:disabled) { border-color: #091a12; background: #14271f; box-shadow: 0 3px 7px rgba(18, 39, 29, .24); }
@@ -226,6 +229,19 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .mobile-entry-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 0 14px; border: 1px solid #14271f; border-radius: 10px; background: #243a31; color: #fff; font-size: 12px; font-weight: 750; box-shadow: 0 3px 7px rgba(18, 39, 29, .22); cursor: pointer; }
   .mobile-entry-toggle:hover { background: #14271f; }
   .mobile-entry-close { display: grid; flex: 0 0 auto; }
+  .mobile-account-backdrop { position: fixed; z-index: 12; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: transparent; }
+  .account-menu { z-index: 14; flex-direction: row; align-items: center; gap: 0; padding: 0; }
+  .desktop-account-email { display: none; }
+  .mobile-account-toggle { display: grid; place-items: center; width: 40px; height: 40px; padding: 0 0 5px; border: 1px solid #526a5b; border-radius: 10px; background: #243a31; color: #fff; font-size: 27px; font-weight: 800; line-height: 1; box-shadow: 0 2px 5px rgba(18, 39, 29, .2); cursor: pointer; }
+  .mobile-account-toggle:hover { background: #14271f; }
+  .account-actions { position: absolute; z-index: 15; top: calc(100% + 8px); right: 0; display: none; width: min(210px, calc(100vw - 28px)); padding: 10px; border: 1px solid #cbd4ca; border-radius: 12px; background: #fcfcf8; box-shadow: 0 12px 32px rgba(9, 20, 14, .25); }
+  .mobile-account-open .account-actions { display: grid; gap: 8px; }
+  .account-actions .mobile-account-email { display: block; max-width: 100%; padding: 4px 5px 10px; border-bottom: 1px solid #e4e9e1; color: #55645a; font-size: 10px; }
+  .account-actions .button { width: 100%; min-height: 38px; justify-content: flex-start; }
+  .entry-actions { flex-direction: row; align-items: center; gap: 8px; }
+  .edit-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; }
+  .edit-button-label { display: none; }
+  .edit-button-icon { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .history-panel { min-height: 320px; }
   .audit-panel { padding: 17px 15px; }
   .empty-state { padding: 58px 24px; }
@@ -241,9 +257,8 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .brand-lockup { gap: 9px; }
   .brand-lockup h1 { max-width: 170px; font-size: 15px; }
   .brand-lockup .mark.small { width: 36px; height: 36px; }
-  .account-menu { flex-direction: column; align-items: flex-end; gap: 5px; padding-top: 3px; font-size: 10px; }
-  .account-menu span { max-width: 132px; }
-  .account-menu .button { min-height: 32px; }
+  .account-menu { font-size: 10px; }
+  .account-menu .button { min-height: 38px; }
   .welcome-row { align-items: center; padding-top: 23px; }
   .welcome-actions { flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
   .mobile-entry-toggle { min-height: 40px; padding: 0 11px; }
