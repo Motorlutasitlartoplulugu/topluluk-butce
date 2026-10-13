@@ -13,6 +13,7 @@ type LedgerEntry = {
   entry_type: "income" | "expense";
   amount: number;
   category: string;
+  entered_by_name: string | null;
   note: string | null;
   entry_date: string;
   receipt_path: string | null;
@@ -58,6 +59,7 @@ export default function App() {
   const [entryType, setEntryType] = useState<"income" | "expense">("expense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
+  const [enteredByName, setEnteredByName] = useState("");
   const [note, setNote] = useState("");
   const [entryDate, setEntryDate] = useState(localDateValue());
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -123,7 +125,7 @@ export default function App() {
       setCanRecord(true);
       const { data, error } = await client
         .from("ledger_entries")
-        .select("id,entry_type,amount,category,note,entry_date,receipt_path,created_by,created_at")
+        .select("id,entry_type,amount,category,entered_by_name,note,entry_date,receipt_path,created_by,created_at")
         .order("entry_date", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -230,6 +232,14 @@ export default function App() {
       setFormMessage("Bir kategori yazın.");
       return;
     }
+    if (!enteredByName.trim()) {
+      setFormMessage("Kaydı ekleyen kişinin adını yazın.");
+      return;
+    }
+    if (enteredByName.trim().length > 80) {
+      setFormMessage("Kaydı ekleyen kişinin adı en fazla 80 karakter olabilir.");
+      return;
+    }
     if (receipt && !RECEIPT_TYPES.includes(receipt.type)) {
       setFormMessage("Fiş için JPG, PNG veya WebP görseli seçin.");
       return;
@@ -261,6 +271,7 @@ export default function App() {
       entry_type: entryType,
       amount: numericAmount,
       category: category.trim(),
+      entered_by_name: enteredByName.trim(),
       note: note.trim() || null,
       entry_date: entryDate,
       receipt_path: receiptPath,
@@ -275,6 +286,7 @@ export default function App() {
 
     setAmount("");
     setCategory("");
+    setEnteredByName("");
     setNote("");
     setEntryDate(localDateValue());
     setReceipt(null);
@@ -362,6 +374,8 @@ export default function App() {
                     <div className="amount-field"><input id="amount" type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" required /><span>TRY</span></div>
                     <label htmlFor="category">Kategori</label>
                     <input id="category" value={category} onChange={(event) => setCategory(event.target.value)} maxLength={80} placeholder={entryType === "income" ? "Örn. bağış, aidat" : "Örn. ulaşım, malzeme"} required />
+                    <label htmlFor="entered-by-name">Kaydı ekleyen kişi</label>
+                    <input id="entered-by-name" value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" required />
                     <label htmlFor="entry-date">Tarih</label>
                     <input id="entry-date" type="date" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} required />
                     <label htmlFor="note">Açıklama <span>İsteğe bağlı</span></label>
@@ -387,7 +401,7 @@ export default function App() {
                       {entries.map((entry) => (
                         <article className="entry-row" key={entry.id}>
                           <div className={entry.entry_type === "income" ? "entry-symbol income-symbol" : "entry-symbol expense-symbol"} aria-hidden="true">{entry.entry_type === "income" ? "↙" : "↗"}</div>
-                          <div className="entry-main"><strong>{entry.category}</strong><span>{formatDate(entry.entry_date)}{entry.note ? ` · ${entry.note}` : ""}</span>{entry.receipt_path && (entry.receipt_url ? <a className="receipt-link" href={entry.receipt_url} target="_blank" rel="noreferrer">Fiş görselini aç ↗</a> : <small className="receipt-unavailable">Fiş görseli şu anda açılamıyor</small>)}</div>
+                          <div className="entry-main"><strong>{entry.category}</strong><span>{formatDate(entry.entry_date)} · Ekleyen: {entry.entered_by_name || "Belirtilmemiş"}{entry.note ? ` · ${entry.note}` : ""}</span>{entry.receipt_path && (entry.receipt_url ? <a className="receipt-link" href={entry.receipt_url} target="_blank" rel="noreferrer">Fiş görselini aç ↗</a> : <small className="receipt-unavailable">Fiş görseli şu anda açılamıyor</small>)}</div>
                           <strong className={entry.entry_type === "income" ? "entry-amount income-text" : "entry-amount expense-text"}>{entry.entry_type === "income" ? "+" : "−"}{formatMoney(Number(entry.amount))}</strong>
                         </article>
                       ))}

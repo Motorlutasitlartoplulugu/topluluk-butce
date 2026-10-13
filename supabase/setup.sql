@@ -12,6 +12,9 @@ create table if not exists public.ledger_entries (
   entry_type text not null check (entry_type in ('income', 'expense')),
   amount numeric(14,2) not null check (amount > 0),
   category text not null check (char_length(btrim(category)) between 1 and 80),
+  entered_by_name text check (
+    entered_by_name is null or char_length(btrim(entered_by_name)) between 1 and 80
+  ),
   note text check (note is null or char_length(note) <= 500),
   entry_date date not null default current_date,
   receipt_path text,
