@@ -610,14 +610,14 @@ export default function App() {
                     </fieldset>
                     <label htmlFor="amount">Tutar <span>₺</span></label>
                     <div className="amount-field"><input id="amount" type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" required /><span>TRY</span></div>
-                    <label htmlFor="category">Kategori</label>
-                    <input id="category" value={category} onChange={(event) => setCategory(event.target.value)} maxLength={80} placeholder={entryType === "income" ? "Örn. bağış, aidat" : "Örn. ulaşım, malzeme"} required />
+                    <label htmlFor="category">İşlem adı</label>
+                    <input id="category" value={category} onChange={(event) => setCategory(event.target.value)} maxLength={80} required />
                     <label htmlFor={editingEntry ? "editor-name" : "entered-by-name"}>{editingEntry ? "Düzenlemeyi yapan kişi" : "Kaydı ekleyen kişi"}</label>
                     <input id={editingEntry ? "editor-name" : "entered-by-name"} value={editingEntry ? editorName : enteredByName} onChange={(event) => editingEntry ? setEditorName(event.target.value) : setEnteredByName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" required />
                     <label htmlFor="entry-date">Tarih</label>
                     <input id="entry-date" type="date" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} required />
                     <label htmlFor="note">Açıklama <span>İsteğe bağlı</span></label>
-                    <textarea id="note" rows={3} maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Bu hareketle ilgili kısa bir not…" />
+                    <textarea id="note" rows={3} maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Toplu gelir veya gider girişlerinde açıklamayı buraya yazın." />
                     <label htmlFor="receipt">Fiş görseli <span>İsteğe bağlı</span></label>
                     {editingEntry?.receipt_path && !receipt && <p className="receipt-preserved">Mevcut fiş korunacak. Yeni bir görsel seçerek değiştirebilirsiniz.</p>}
                     <label className="file-drop" htmlFor="receipt">
@@ -657,7 +657,7 @@ export default function App() {
                     {auditLogs.map((log) => {
                       const before = log.old_values ?? {};
                       const after = log.new_values ?? {};
-                      const fields: Array<[string, string]> = [["entry_type", "Tür"], ["amount", "Tutar"], ["category", "Kategori"], ["entry_date", "Tarih"], ["note", "Açıklama"], ["receipt_path", "Fiş"]];
+                      const fields: Array<[string, string]> = [["entry_type", "Tür"], ["amount", "Tutar"], ["category", "İşlem adı"], ["entry_date", "Tarih"], ["note", "Açıklama"], ["receipt_path", "Fiş"]];
                       const changes = log.action === "created" ? `Yeni ${after.entry_type === "income" ? "gelir" : "gider"}: ${String(after.category ?? "")} · ${formatMoney(Number(after.amount ?? 0))}` : fields.filter(([key]) => before[key] !== after[key]).map(([key, label]) => `${label}: ${key === "amount" ? `${formatMoney(Number(before[key] ?? 0))} → ${formatMoney(Number(after[key] ?? 0))}` : key === "entry_type" ? `${before[key] === "income" ? "Gelir" : "Gider"} → ${after[key] === "income" ? "Gelir" : "Gider"}` : key === "receipt_path" ? `${before[key] ? "Değiştirildi" : "Yüklendi"}` : `${String(before[key] ?? "—")} → ${String(after[key] ?? "—")}`}`).join(" · ") || "Kayıt güncellendi";
                       const actionLabel = log.action === "created" ? "ekledi" : log.action === "deleted" ? "sildi" : "düzenledi";
                       const detail = log.action === "deleted" ? `Silinen kayıt: ${String(before.category ?? after.category ?? "")} · ${formatMoney(Number(before.amount ?? after.amount ?? 0))}` : changes;
