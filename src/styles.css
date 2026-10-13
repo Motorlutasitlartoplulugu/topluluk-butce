@@ -189,6 +189,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .settings-form label, .settings-section label { color: #34463c; font-size: 12px; font-weight: 700; }
 .settings-form input, .settings-section > input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #cbd4ca; border-radius: 9px; background: white; }
 .settings-form .button { width: 100%; margin-top: 2px; background: #243a31; }
+.reset-password-button { justify-content: flex-start; padding: 0; color: #354b40; text-decoration: underline; }
 .settings-content { display: grid; gap: 15px; }
 .settings-section { display: grid; justify-items: start; gap: 9px; padding: 16px; border: 1px solid #e0e5dd; border-radius: 12px; background: #f7f8f3; }
 .settings-section h3 { margin: 0; color: #26372f; font-family: "Manrope", sans-serif; font-size: 14px; }
