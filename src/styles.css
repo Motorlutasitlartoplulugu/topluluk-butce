@@ -99,14 +99,15 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .muted { margin: 0; color: #78827a; font-size: 13px; }
 .entry-count { padding-bottom: 3px; color: #315c49; font-family: "Manrope", sans-serif; font-size: 20px; font-weight: 800; }
 .entry-count span { color: #8a948c; font-family: "DM Sans", sans-serif; font-size: 12px; font-weight: 500; }
-.summary-grid { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 13px; }
+.summary-grid { display: grid; grid-template-columns: 1fr 1.45fr 1fr; gap: 13px; }
 .summary-card { min-height: 117px; padding: 17px 19px; border: 1px solid #e2e5dc; border-radius: 14px; background: rgba(255,255,252,.87); }
 .summary-card span { display: block; margin-bottom: 9px; color: #738076; font-size: 12px; }
 .summary-card strong { display: block; color: #23382d; font-family: "Manrope", sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.035em; }
 .summary-card small { display: block; margin-top: 7px; color: #969e96; font-size: 10px; }
-.balance-card { border-color: #cad9cc; background: #eaf0e8; }
-.balance-card span, .balance-card small { color: #5c7562; }
+.balance-card { min-height: 132px; border-color: #c5cbc7; background: #e4e7e4; }
+.balance-card span, .balance-card small { color: #59645d; }
 .balance-card { display: grid; align-content: center; justify-items: center; text-align: center; }
+.balance-card strong { font-size: 25px; }
 .income-card { border-color: #a9cbb0; background: rgba(229, 243, 229, .96); }
 .income-card span, .income-card small { color: #39734a; }
 .expenses-card { border-color: #dfb4ac; background: rgba(250, 233, 229, .96); }
@@ -231,11 +232,11 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .welcome-row { padding-top: 23px; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .summary-card { min-height: 98px; padding: 12px; }
-  .balance-card { grid-column: 1 / -1; grid-row: 1; min-height: 105px; }
+  .balance-card { grid-column: 1 / -1; grid-row: 1; min-height: 118px; }
   .income-card { grid-column: 1; grid-row: 2; }
   .expenses-card { grid-column: 2; grid-row: 2; }
   .summary-card strong { font-size: 18px; }
-  .balance-card strong { font-size: 23px; }
+  .balance-card strong { font-size: 24px; }
   .summary-card small { font-size: 9px; }
   .form-panel, .history-panel { padding: 17px 15px; }
   .entry-row { grid-template-columns: 32px minmax(0,1fr) auto; gap: 8px; }
