@@ -585,9 +585,9 @@ export default function App() {
               </section>
 
               <section className="summary-grid" aria-label="Bakiye özeti">
+                <article className="summary-card income-card"><span>Toplam gelir</span><strong className="income-text">{formatMoney(totals.income)}</strong><small>Kaydedilen tüm gelirler</small></article>
                 <article className="summary-card balance-card"><span>Güncel bakiye</span><strong>{formatMoney(totals.balance)}</strong><small>Toplam gelir − toplam gider</small></article>
-                <article className="summary-card"><span>Toplam gelir</span><strong className="income-text">{formatMoney(totals.income)}</strong><small>Kaydedilen tüm gelirler</small></article>
-                <article className="summary-card"><span>Toplam gider</span><strong className="expense-text">{formatMoney(totals.expense)}</strong><small>Kaydedilen tüm giderler</small></article>
+                <article className="summary-card expenses-card"><span>Masraflar</span><strong className="expense-text">{formatMoney(totals.expense)}</strong><small>Kaydedilen tüm masraflar</small></article>
               </section>
 
               <div className="content-grid">
