@@ -306,4 +306,399 @@ end;
 $$;
 revoke all on function public.delete_all_ledger_entries(text) from public, anon;
 grant execute on function public.delete_all_ledger_entries(text) to authenticated;
+alter table public.ledger_entry_audit
+  drop constraint if exists ledger_entry_audit_action_check;
+alter table public.ledger_entry_audit
+  add constraint ledger_entry_audit_action_check
+  check (action in ('created', 'updated', 'deleted'));
+
+create schema if not exists app_private;
+revoke all on schema app_private from public, anon, authenticated;
+create table if not exists app_private.ledger_settings (
+  singleton_id smallint primary key check (singleton_id = 1),
+  password_hash text not null,
+  failed_attempts integer not null default 0,
+  locked_until timestamptz
+);
+alter table app_private.ledger_settings enable row level security;
+revoke all on table app_private.ledger_settings from public, anon, authenticated;
+
+create or replace function app_private.verify_ledger_settings_password(p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  settings_row app_private.ledger_settings%rowtype;
+begin
+  select * into settings_row
+  from app_private.ledger_settings
+  where singleton_id = 1
+  for update;
+  if not found then return false; end if;
+  if settings_row.locked_until is not null and settings_row.locked_until > pg_catalog.now() then
+    return false;
+  end if;
+  if p_password is null or extensions.crypt(p_password, settings_row.password_hash) <> settings_row.password_hash then
+    update app_private.ledger_settings
+    set failed_attempts = failed_attempts + 1,
+        locked_until = case when failed_attempts + 1 >= 5 then pg_catalog.now() + interval '15 minutes' else null end
+    where singleton_id = 1;
+    return false;
+  end if;
+  update app_private.ledger_settings
+  set failed_attempts = 0, locked_until = null
+  where singleton_id = 1;
+  return true;
+end;
+$$;
+revoke all on function app_private.verify_ledger_settings_password(text) from public, anon, authenticated;
+
+create or replace function public.ledger_settings_password_configured()
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  return exists (select 1 from app_private.ledger_settings where singleton_id = 1);
+end;
+$$;
+revoke all on function public.ledger_settings_password_configured() from public, anon, authenticated;
+grant execute on function public.ledger_settings_password_configured() to authenticated;
+
+create or replace function public.set_ledger_settings_password(p_password text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  if p_password is null or char_length(p_password) < 12 or char_length(p_password) > 128 then
+    raise exception 'Settings password must be 12 to 128 characters';
+  end if;
+  insert into app_private.ledger_settings (singleton_id, password_hash)
+  values (1, extensions.crypt(p_password, extensions.gen_salt('bf')))
+  on conflict (singleton_id) do nothing;
+  if not found then raise exception 'Settings password has already been configured'; end if;
+end;
+$$;
+revoke all on function public.set_ledger_settings_password(text) from public, anon, authenticated;
+grant execute on function public.set_ledger_settings_password(text) to authenticated;
+
+create or replace function public.verify_ledger_settings_password(p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  return app_private.verify_ledger_settings_password(p_password);
+end;
+$$;
+revoke all on function public.verify_ledger_settings_password(text) from public, anon, authenticated;
+grant execute on function public.verify_ledger_settings_password(text) to authenticated;
+
+create or replace function public.log_ledger_entry_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  audit_actor text;
+begin
+  if tg_op = 'INSERT' then
+    audit_actor := coalesce(nullif(btrim(new.entered_by_name), ''), 'Belirtilmemiş');
+    insert into public.ledger_entry_audit (
+      ledger_entry_id, action, actor_name, actor_user_id, new_values
+    ) values (
+      new.id, 'created', audit_actor, new.created_by,
+      jsonb_build_object(
+        'entry_type', new.entry_type, 'amount', new.amount,
+        'category', new.category, 'entered_by_name', new.entered_by_name,
+        'note', new.note, 'entry_date', new.entry_date,
+        'receipt_path', new.receipt_path
+      )
+    );
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    audit_actor := nullif(btrim(current_setting('app.ledger_actor', true)), '');
+    if audit_actor is null or char_length(audit_actor) > 80 then
+      raise exception 'A valid actor name is required to delete ledger entries';
+    end if;
+    insert into public.ledger_entry_audit (
+      ledger_entry_id, action, actor_name, actor_user_id, old_values, new_values
+    ) values (
+      old.id, 'deleted', audit_actor, auth.uid(),
+      jsonb_build_object(
+        'entry_type', old.entry_type, 'amount', old.amount,
+        'category', old.category, 'entered_by_name', old.entered_by_name,
+        'note', old.note, 'entry_date', old.entry_date,
+        'receipt_path', old.receipt_path
+      ), '{}'::jsonb
+    );
+    return old;
+  end if;
+
+  audit_actor := nullif(btrim(new.updated_by_name), '');
+  if audit_actor is null or char_length(audit_actor) > 80 then
+    raise exception 'A valid editor name is required';
+  end if;
+  insert into public.ledger_entry_audit (
+    ledger_entry_id, action, actor_name, actor_user_id, old_values, new_values
+  ) values (
+    new.id, 'updated', audit_actor, auth.uid(),
+    jsonb_build_object(
+      'entry_type', old.entry_type, 'amount', old.amount,
+      'category', old.category, 'entered_by_name', old.entered_by_name,
+      'updated_by_name', old.updated_by_name, 'note', old.note,
+      'entry_date', old.entry_date, 'receipt_path', old.receipt_path
+    ),
+    jsonb_build_object(
+      'entry_type', new.entry_type, 'amount', new.amount,
+      'category', new.category, 'entered_by_name', new.entered_by_name,
+      'updated_by_name', new.updated_by_name, 'note', new.note,
+      'entry_date', new.entry_date, 'receipt_path', new.receipt_path
+    )
+  );
+  return new;
+end;
+$$;
+
+revoke all on function public.log_ledger_entry_change() from public, anon, authenticated;
+drop trigger if exists ledger_entries_audit_delete on public.ledger_entries;
+create trigger ledger_entries_audit_delete
+  before delete on public.ledger_entries
+  for each row execute function public.log_ledger_entry_change();
+
+drop function if exists public.delete_all_ledger_entries(text);
+revoke delete on public.ledger_entries from anon, authenticated;
+drop policy if exists ledger_entries_member_delete on public.ledger_entries;
+
+create or replace function public.delete_all_ledger_entries(p_actor_name text, p_password text)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deleted_count integer;
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to delete ledger entries';
+  end if;
+  if p_actor_name is null or char_length(btrim(p_actor_name)) not between 1 and 80 then
+    raise exception 'A valid actor name is required';
+  end if;
+  if not app_private.verify_ledger_settings_password(p_password) then
+    raise exception 'Invalid settings password';
+  end if;
+  perform pg_catalog.set_config('app.ledger_actor', btrim(p_actor_name), true);
+  delete from public.ledger_entries;
+  get diagnostics deleted_count = row_count;
+  return deleted_count;
+end;
+$$;
+revoke all on function public.delete_all_ledger_entries(text, text) from public, anon, authenticated;
+grant execute on function public.delete_all_ledger_entries(text, text) to authenticated;
+
+drop policy if exists community_receipts_member_delete on storage.objects;
+create policy community_receipts_member_delete
+  on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'community-receipts'
+    and exists (
+      select 1 from public.ledger_members m
+      where m.user_id = (select auth.uid()) and m.can_record
+    )
+  );
+
+create policy ledger_settings_reject_api_access
+  on app_private.ledger_settings
+  for all to anon, authenticated
+  using (false)
+  with check (false);
+
+create or replace function app_private.ledger_settings_password_is_configured()
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from app_private.ledger_settings where singleton_id = 1)
+$$;
+
+create or replace function app_private.initialize_ledger_settings_password(p_password text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  if p_password is null or char_length(p_password) < 12 or char_length(p_password) > 128 then
+    raise exception 'Settings password must be 12 to 128 characters';
+  end if;
+  insert into app_private.ledger_settings (singleton_id, password_hash)
+  values (1, extensions.crypt(p_password, extensions.gen_salt('bf')))
+  on conflict (singleton_id) do nothing;
+  if not found then raise exception 'Settings password has already been configured'; end if;
+end;
+$$;
+
+create or replace function app_private.verify_ledger_settings_password(p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  settings_row app_private.ledger_settings%rowtype;
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  select * into settings_row
+  from app_private.ledger_settings where singleton_id = 1 for update;
+  if not found then return false; end if;
+  if settings_row.locked_until is not null and settings_row.locked_until > pg_catalog.now() then return false; end if;
+  if p_password is null or extensions.crypt(p_password, settings_row.password_hash) <> settings_row.password_hash then
+    update app_private.ledger_settings
+    set failed_attempts = failed_attempts + 1,
+        locked_until = case when failed_attempts + 1 >= 5 then pg_catalog.now() + interval '15 minutes' else null end
+    where singleton_id = 1;
+    return false;
+  end if;
+  update app_private.ledger_settings set failed_attempts = 0, locked_until = null where singleton_id = 1;
+  return true;
+end;
+$$;
+
+create or replace function app_private.delete_all_ledger_entries(p_actor_name text, p_password text)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deleted_count integer;
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to delete ledger entries';
+  end if;
+  if p_actor_name is null or char_length(btrim(p_actor_name)) not between 1 and 80 then
+    raise exception 'A valid actor name is required';
+  end if;
+  if not app_private.verify_ledger_settings_password(p_password) then
+    raise exception 'Invalid settings password';
+  end if;
+  perform pg_catalog.set_config('app.ledger_actor', btrim(p_actor_name), true);
+  delete from public.ledger_entries;
+  get diagnostics deleted_count = row_count;
+  return deleted_count;
+end;
+$$;
+
+revoke all on function app_private.ledger_settings_password_is_configured() from public, anon, authenticated;
+revoke all on function app_private.initialize_ledger_settings_password(text) from public, anon, authenticated;
+revoke all on function app_private.verify_ledger_settings_password(text) from public, anon, authenticated;
+revoke all on function app_private.delete_all_ledger_entries(text, text) from public, anon, authenticated;
+grant usage on schema app_private to authenticated;
+grant execute on function app_private.ledger_settings_password_is_configured() to authenticated;
+grant execute on function app_private.initialize_ledger_settings_password(text) to authenticated;
+grant execute on function app_private.verify_ledger_settings_password(text) to authenticated;
+grant execute on function app_private.delete_all_ledger_entries(text, text) to authenticated;
+
+create or replace function public.ledger_settings_password_configured()
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  return app_private.ledger_settings_password_is_configured();
+end;
+$$;
+
+create or replace function public.set_ledger_settings_password(p_password text)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  perform app_private.initialize_ledger_settings_password(p_password);
+end;
+$$;
+
+create or replace function public.verify_ledger_settings_password(p_password text)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to manage ledger settings';
+  end if;
+  return app_private.verify_ledger_settings_password(p_password);
+end;
+$$;
+
+create or replace function public.delete_all_ledger_entries(p_actor_name text, p_password text)
+returns integer
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or lower(coalesce(auth.jwt() ->> 'email', '')) <> 'akumtt03@gmail.com'
+    or not exists (select 1 from public.ledger_members where user_id = auth.uid() and can_record) then
+    raise exception 'Not authorized to delete ledger entries';
+  end if;
+  return app_private.delete_all_ledger_entries(p_actor_name, p_password);
+end;
+$$;
+
+revoke all on function public.ledger_settings_password_configured() from public, anon;
+revoke all on function public.set_ledger_settings_password(text) from public, anon;
+revoke all on function public.verify_ledger_settings_password(text) from public, anon;
+revoke all on function public.delete_all_ledger_entries(text, text) from public, anon;
+grant execute on function public.ledger_settings_password_configured() to authenticated;
+grant execute on function public.set_ledger_settings_password(text) to authenticated;
+grant execute on function public.verify_ledger_settings_password(text) to authenticated;
+grant execute on function public.delete_all_ledger_entries(text, text) to authenticated;
+
 
