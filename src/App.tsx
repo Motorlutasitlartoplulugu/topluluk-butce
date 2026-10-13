@@ -94,6 +94,7 @@ export default function App() {
 
     let cancelled = false;
     const client = supabase;
+    const currentUser = user;
 
     async function loadLedger() {
       setCheckingAccess(true);
@@ -102,7 +103,7 @@ export default function App() {
       const { data: membership, error: accessError } = await client
         .from("ledger_members")
         .select("can_record")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .maybeSingle();
 
       if (cancelled) return;
