@@ -166,6 +166,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .entry-amount { padding-left: 7px; font-family: "Manrope", sans-serif; font-size: 12px; white-space: nowrap; }
 .entry-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .edit-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid #14271f; border-radius: 8px; background: #243a31; color: #fff; box-shadow: 0 2px 4px rgba(18, 39, 29, .18); cursor: pointer; }
+.edit-button-label { display: none; }
 .edit-button-icon { display: block; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .edit-button:hover:not(:disabled) { border-color: #b9cbbd; background: #edf3ec; }
 .edit-button:disabled { opacity: .6; cursor: wait; }
