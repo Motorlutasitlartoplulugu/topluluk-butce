@@ -94,6 +94,11 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .text-button { min-height: 34px; padding: 6px 10px; border: 1px solid #84988b; border-radius: 8px; background: rgba(248, 250, 246, .94); color: #20392d; font-size: 12px; font-weight: 750; box-shadow: 0 1px 3px rgba(24, 43, 32, .12); cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s; }
 .text-button:hover { border-color: #496653; background: #eaf0e8; box-shadow: 0 2px 5px rgba(24, 43, 32, .17); }
 .welcome-row { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 29px 0 19px; }
+.welcome-actions { display: flex; align-items: center; gap: 14px; }
+.mobile-entry-toggle, .mobile-entry-backdrop, .mobile-entry-close { display: none; }
+.hamburger-icon { display: grid; gap: 4px; width: 18px; }
+.hamburger-icon i { display: block; height: 2px; border-radius: 2px; background: currentColor; }
+.form-heading-actions { display: flex; align-items: center; gap: 8px; }
 .welcome-row .eyebrow { margin-bottom: 6px; }
 .welcome-row h2 { margin: 0 0 6px; font-family: "Manrope", sans-serif; font-size: clamp(23px, 4vw, 29px); letter-spacing: -.04em; }
 .muted { margin: 0; color: #78827a; font-size: 13px; }
@@ -214,6 +219,12 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .page-shell { padding: 18px 13px 32px; }
   .page-shell::before { opacity: .1; }
   .content-grid { grid-template-columns: 1fr; }
+  .content-grid .form-panel { display: none; }
+  .content-grid .form-panel.mobile-entry-open { position: fixed; z-index: 12; inset: 12px 12px auto; display: block; width: auto; max-height: calc(100dvh - 24px); overflow: auto; box-shadow: 0 24px 70px rgba(9, 20, 14, .38); }
+  .mobile-entry-backdrop { position: fixed; z-index: 11; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: rgba(12, 24, 18, .62); backdrop-filter: blur(3px); }
+  .mobile-entry-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 0 14px; border: 1px solid #14271f; border-radius: 10px; background: #243a31; color: #fff; font-size: 12px; font-weight: 750; box-shadow: 0 3px 7px rgba(18, 39, 29, .22); cursor: pointer; }
+  .mobile-entry-toggle:hover { background: #14271f; }
+  .mobile-entry-close { display: grid; flex: 0 0 auto; }
   .history-panel { min-height: 320px; }
   .audit-panel { padding: 17px 15px; }
   .empty-state { padding: 58px 24px; }
@@ -232,7 +243,9 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .account-menu { flex-direction: column; align-items: flex-end; gap: 5px; padding-top: 3px; font-size: 10px; }
   .account-menu span { max-width: 132px; }
   .account-menu .button { min-height: 32px; }
-  .welcome-row { padding-top: 23px; }
+  .welcome-row { align-items: center; padding-top: 23px; }
+  .welcome-actions { flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
+  .mobile-entry-toggle { min-height: 40px; padding: 0 11px; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .summary-card { min-height: 98px; padding: 12px; }
   .balance-card { grid-column: 1 / -1; grid-row: 1; min-height: 118px; }
