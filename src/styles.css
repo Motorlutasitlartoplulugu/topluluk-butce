@@ -108,9 +108,9 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .balance-card span, .balance-card small { color: #59645d; }
 .balance-card { display: grid; align-content: center; justify-items: center; text-align: center; }
 .balance-card strong { font-size: 25px; }
-.income-card { border-color: #a9cbb0; background: rgba(229, 243, 229, .96); }
+.income-card { display: grid; align-content: center; justify-items: center; text-align: center; border-color: #a9cbb0; background: rgba(229, 243, 229, .96); }
 .income-card span, .income-card small { color: #39734a; }
-.expenses-card { border-color: #dfb4ac; background: rgba(250, 233, 229, .96); }
+.expenses-card { display: grid; align-content: center; justify-items: center; text-align: center; border-color: #dfb4ac; background: rgba(250, 233, 229, .96); }
 .expenses-card span, .expenses-card small { color: #99483d; }
 .income-text { color: #30714a !important; }
 .expense-text { color: #a14c3f !important; }
