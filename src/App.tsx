@@ -72,6 +72,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [entryType, setEntryType] = useState<"income" | "expense">("expense");
   const [mobileEntryOpen, setMobileEntryOpen] = useState(false);
+  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [enteredByName, setEnteredByName] = useState("");
@@ -568,7 +569,16 @@ export default function App() {
               <img className="mark small brand-mark-image" src="https://i.hizliresim.com/3jbtlkgx.png" alt="" aria-hidden="true" />
               <div><p className="eyebrow">MOTORLU TAŞITLAR TOPLULUĞU</p><h1>Topluluk Bütçesi</h1></div>
             </div>
-            <div className="account-menu"><span title={user.email ?? undefined}>{user.email}</span><button className="button settings-button" type="button" onClick={openSettings}>Ayarlar</button><button className="button logout-button" onClick={handleSignOut} disabled={busy}>Çıkış</button></div>
+            {mobileAccountOpen && <button className="mobile-account-backdrop" type="button" aria-label="Hesap menüsünü kapat" onClick={() => setMobileAccountOpen(false)} />}
+            <div className={`account-menu${mobileAccountOpen ? " mobile-account-open" : ""}`}>
+              <span className="desktop-account-email" title={user.email ?? undefined}>{user.email}</span>
+              <button className="mobile-account-toggle" type="button" aria-label="Hesap menüsü" aria-expanded={mobileAccountOpen} onClick={() => setMobileAccountOpen((open) => !open)}>⋮</button>
+              <div className="account-actions">
+                <span className="mobile-account-email">{user.email}</span>
+                <button className="button settings-button" type="button" onClick={() => { setMobileAccountOpen(false); void openSettings(); }}>Ayarlar</button>
+                <button className="button logout-button" type="button" onClick={() => { setMobileAccountOpen(false); void handleSignOut(); }} disabled={busy}>Çıkış</button>
+              </div>
+            </div>
           </header>
 
           {checkingAccess ? (
@@ -641,7 +651,7 @@ export default function App() {
                         <article className="entry-row" key={entry.id}>
                           <div className={entry.entry_type === "income" ? "entry-symbol income-symbol" : "entry-symbol expense-symbol"} aria-hidden="true">{entry.entry_type === "income" ? "↙" : "↗"}</div>
                           <div className="entry-main"><strong>{entry.category}</strong><span>{formatDate(entry.entry_date)} · Ekleyen: {entry.entered_by_name || "Belirtilmemiş"}{entry.note ? ` · ${entry.note}` : ""}</span>{entry.receipt_path && (entry.receipt_url ? <a className="receipt-link" href={entry.receipt_url} target="_blank" rel="noreferrer">Fiş görselini aç ↗</a> : <small className="receipt-unavailable">Fiş görseli şu anda açılamıyor</small>)}</div>
-                          <div className="entry-actions"><strong className={entry.entry_type === "income" ? "entry-amount income-text" : "entry-amount expense-text"}>{entry.entry_type === "income" ? "+" : "−"}{formatMoney(Number(entry.amount))}</strong><button className="edit-button" type="button" onClick={() => beginEdit(entry)} disabled={busy} aria-label={`${entry.category} kaydını düzenle`}>Düzenle</button></div>
+                          <div className="entry-actions"><strong className={entry.entry_type === "income" ? "entry-amount income-text" : "entry-amount expense-text"}>{entry.entry_type === "income" ? "+" : "−"}{formatMoney(Number(entry.amount))}</strong><button className="edit-button" type="button" onClick={() => beginEdit(entry)} disabled={busy} aria-label={`${entry.category} kaydını düzenle`}><span className="edit-button-label">Düzenle</span><svg className="edit-button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg></button></div>
                         </article>
                       ))}
                     </div>
