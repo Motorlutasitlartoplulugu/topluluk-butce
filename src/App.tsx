@@ -89,10 +89,17 @@ export default function App() {
   const [settingsMessage, setSettingsMessage] = useState("");
   const [deleteActorName, setDeleteActorName] = useState("");
   const [backgroundImage, setBackgroundImage] = useState("");
+  const [backgroundUrlInput, setBackgroundUrlInput] = useState("");
 
   useEffect(() => {
     try {
-      setBackgroundImage(localStorage.getItem("community-ledger-background") ?? "");
+      const savedBackground = localStorage.getItem("community-ledger-background") ?? "";
+      if (savedBackground.startsWith("https://") || savedBackground.startsWith("http://")) {
+        setBackgroundImage(savedBackground);
+        setBackgroundUrlInput(savedBackground);
+      } else if (savedBackground) {
+        localStorage.removeItem("community-ledger-background");
+      }
     } catch {
       setBackgroundImage("");
     }
@@ -161,6 +168,7 @@ export default function App() {
       const { data, error } = await client
         .from("ledger_entries")
         .select("id,entry_type,amount,category,entered_by_name,note,entry_date,receipt_path,created_by,created_at")
+        .is("deleted_at", null)
         .order("entry_date", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -355,33 +363,25 @@ export default function App() {
     setSettingsMessage("Ayar şifresi yenilendi.");
   }
 
-  function handleBackgroundChange(file: File | undefined) {
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setSettingsMessage("Arka plan için JPG, PNG veya WebP görseli seçin.");
-      return;
+  function applyBackgroundUrl() {
+    const input = backgroundUrlInput.trim();
+    try {
+      const parsed = new URL(input);
+      if (!(parsed.protocol === "https:" || parsed.protocol === "http:")) throw new Error("Invalid protocol");
+      const safeUrl = parsed.href;
+      localStorage.setItem("community-ledger-background", safeUrl);
+      setBackgroundImage(safeUrl);
+      setBackgroundUrlInput(safeUrl);
+      setSettingsMessage("Arka plan URL’si bu tarayıcıda kaydedildi.");
+    } catch {
+      setSettingsMessage("Geçerli bir http:// veya https:// görsel URL’si girin.");
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setSettingsMessage("Görsel en fazla 2 MB olabilir.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = String(reader.result ?? "");
-      try {
-        localStorage.setItem("community-ledger-background", image);
-        setBackgroundImage(image);
-        setSettingsMessage("Arka plan bu tarayıcıda kaydedildi.");
-      } catch {
-        setSettingsMessage("Görsel kaydedilemedi. Daha küçük bir görsel seçin.");
-      }
-    };
-    reader.readAsDataURL(file);
   }
 
   function resetBackground() {
     localStorage.removeItem("community-ledger-background");
     setBackgroundImage("");
+    setBackgroundUrlInput("");
     setSettingsMessage("Varsayılan arka plan geri yüklendi.");
   }
 
@@ -400,24 +400,18 @@ export default function App() {
       setSettingsMessage("Silinecek kayıt yok.");
       return;
     }
-    if (!window.confirm(`${entries.length} kasa kaydı silinecek. İşlem geçmişinde kimin sildiği tutulacak. Devam edilsin mi?`)) return;
+    if (!window.confirm(`${entries.length} kasa kaydı görünümden kaldırılacak. Kayıtlar ve fişleri saklanacak; silme işlemi işlem geçmişinde kalacak. Devam edilsin mi?`)) return;
     setBusy(true);
     setSettingsMessage("");
     const { data, error } = await supabase.rpc("delete_all_ledger_entries", { p_actor_name: actorName, p_password: settingsPassphrase });
     if (error) {
       setBusy(false);
-      setSettingsMessage("Kayıtlar silinemedi. Sunucu şeması güncel olmayabilir; yöneticiyle iletişime geçin.");
+      setSettingsMessage("Kayıtlar görünümden kaldırılamadı. Sunucu şeması güncel olmayabilir; yöneticiyle iletişime geçin.");
       return;
     }
-    const receiptPaths = entries.flatMap((entry) => entry.receipt_path ? [entry.receipt_path] : []);
-    const { error: receiptError } = receiptPaths.length
-      ? await supabase.storage.from(RECEIPTS_BUCKET).remove(receiptPaths)
-      : { error: null };
     setBusy(false);
     setDeleteActorName("");
-    setSettingsMessage(receiptError
-      ? `${Number(data ?? 0)} kayıt silindi ve geçmişe eklendi; bazı fiş görselleri silinemedi.`
-      : `${Number(data ?? 0)} kayıt silindi ve işlem geçmişine eklendi.`);
+    setSettingsMessage(`${Number(data ?? 0)} kayıt görünümden kaldırıldı; kayıtlar, fişler ve silme geçmişi saklanıyor.`);
     setRefreshKey((value) => value + 1);
   }
 
@@ -533,7 +527,7 @@ export default function App() {
   }
 
   return (
-    <main className="page-shell" style={backgroundImage ? { "--user-background": `url("${backgroundImage}")` } as CSSProperties : undefined}>
+    <main className="page-shell" style={backgroundImage ? { "--user-background": `url("${backgroundImage.replace(/[\\"\n\r]/g, "\\$&")}")` } as CSSProperties : undefined}>
       {!user ? (
         <section className="auth-card" aria-labelledby="page-title">
           <div className="mark" aria-hidden="true">₺</div>
@@ -649,7 +643,7 @@ export default function App() {
               <section className="panel audit-panel" aria-labelledby="audit-title">
                 <div className="panel-heading"><div><p className="eyebrow">KAYIT İZİ</p><h2 id="audit-title">İşlem geçmişi</h2></div><span className="secure-label"><span /> Son 40 işlem</span></div>
                 {auditMessage && <p className="message history-message" role="status">{auditMessage}</p>}
-                {!auditMessage && auditLogs.length === 0 ? <p className="audit-empty">Henüz kaydedilmiş işlem geçmişi yok. Bu tarihten sonra eklenen ve düzenlenen hareketler burada görünür.</p> : (
+                {!auditMessage && auditLogs.length === 0 ? <p className="audit-empty">Henüz kaydedilmiş işlem geçmişi yok. Eklenen, düzenlenen ve görünümden kaldırılan hareketler burada görünür.</p> : (
                   <div className="audit-list">
                     {auditLogs.map((log) => {
                       const before = log.old_values ?? {};
@@ -668,10 +662,10 @@ export default function App() {
                 <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
                   <div className="panel-heading"><div><p className="eyebrow">TERCİHLER VE YÖNETİM</p><h2 id="settings-title">Ayarlar</h2></div><button className="icon-button" type="button" aria-label="Ayarları kapat" onClick={() => { setSettingsOpen(false); setSettingsPassphrase(""); setSettingsConfirmPassphrase(""); setAccountPassword(""); }}>×</button></div>
                   {settingsPasswordConfigured === null ? <p className="status" role="status">Ayarlar doğrulanıyor…</p> : !settingsUnlocked && settingsPasswordConfigured && !settingsResetMode ? <><form className="settings-form" onSubmit={unlockSettings}><p className="muted">Ayarları açmak için şifrenizi girin.</p><label htmlFor="settings-password">Ayar şifresi</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} maxLength={128} autoComplete="current-password" required /><button className="button" type="submit">Ayarları aç</button></form><button className="text-button reset-password-button" type="button" onClick={() => { setSettingsResetMode(true); setSettingsMessage(""); }}>Ayar şifresini yenile</button></> : !settingsUnlocked ? <form className="settings-form" onSubmit={settingsResetMode ? resetSettingsPassword : unlockSettings}><p className="muted">{settingsResetMode ? "Hesap şifreni tekrar doğrula ve yeni ayar şifresi belirle." : "İlk kullanım: kendine özel bir ayar şifresi oluştur."}</p>{settingsResetMode && <><label htmlFor="account-password">Hesap şifresi</label><input id="account-password" type="password" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} autoComplete="current-password" required /></>}<label htmlFor="settings-password">Yeni ayar şifresi (en az 12 karakter)</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /><label htmlFor="settings-password-confirm">Şifreyi tekrar girin</label><input id="settings-password-confirm" type="password" value={settingsConfirmPassphrase} onChange={(event) => setSettingsConfirmPassphrase(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /><button className="button" type="submit" disabled={busy}>{busy ? "Kaydediliyor…" : settingsResetMode ? "Şifreyi doğrula ve yenile" : "Şifreyi kaydet ve aç"}</button></form> : <div className="settings-content">
-                    <section className="settings-section"><h3>Arka plan</h3><p>Yeni bir görsel seçin. Seçim bu tarayıcıda saklanır.</p><label className="button settings-action" htmlFor="background-file">Arka planı değiştir<input id="background-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleBackgroundChange(event.currentTarget.files?.[0])} /></label>{backgroundImage && <button className="button secondary settings-action" type="button" onClick={resetBackground}>Varsayılan arka plana dön</button>}</section>
-                    <section className="settings-section danger-zone"><h3>Kasa kayıtlarını sil</h3><p>Tüm gelir ve gider kayıtları silinir. İşlem geçmişinde silme işlemi ve yapan kişinin adı kalır.</p><label htmlFor="delete-actor-name">İşlemi yapan kişi</label><input id="delete-actor-name" value={deleteActorName} onChange={(event) => setDeleteActorName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" /><button className="button danger-button" type="button" onClick={deleteAllEntries} disabled={busy || entries.length === 0}>{busy ? "Siliniyor…" : `Tüm kayıtları sil (${entries.length})`}</button></section>
+                    <section className="settings-section"><h3>Arka plan</h3><p>Görsel bağlantısını girin. URL yalnızca bu tarayıcıda saklanır.</p><label htmlFor="background-url">Görsel URL’si</label><input id="background-url" type="url" inputMode="url" value={backgroundUrlInput} onChange={(event) => setBackgroundUrlInput(event.target.value)} placeholder="https://ornek.com/arka-plan.jpg" autoComplete="url" /><button className="button settings-action" type="button" onClick={applyBackgroundUrl}>URL’yi uygula</button>{backgroundImage && <button className="button secondary settings-action" type="button" onClick={resetBackground}>Varsayılan arka plana dön</button>}</section>
+                    <section className="settings-section danger-zone"><h3>Kasa kayıtlarını sil</h3><p>Tüm gelir ve gider kayıtları görünümden kaldırılır. Kayıtlar ve fişler saklanır; silme işlemi ve yapan kişinin adı işlem geçmişinde kalır.</p><label htmlFor="delete-actor-name">İşlemi yapan kişi</label><input id="delete-actor-name" value={deleteActorName} onChange={(event) => setDeleteActorName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" /><button className="button danger-button" type="button" onClick={deleteAllEntries} disabled={busy || entries.length === 0}>{busy ? "Kaldırılıyor…" : `Tüm kayıtları kaldır (${entries.length})`}</button></section>
                   </div>}
-                  {settingsMessage && <p className={settingsMessage.includes("silindi") || settingsMessage.includes("kaydedildi") || settingsMessage.includes("yüklendi") || settingsMessage.includes("geri yüklendi") ? "message success-message" : "message"} role="status">{settingsMessage}</p>}
+                  {settingsMessage && <p className={settingsMessage.includes("kaldırıldı") || settingsMessage.includes("kaydedildi") || settingsMessage.includes("geri yüklendi") ? "message success-message" : "message"} role="status">{settingsMessage}</p>}
                 </section>
               </div>}
             </>
