@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import type { CSSProperties } from "react";
 import type { User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import "./styles.css";
@@ -26,7 +27,7 @@ type LedgerEntry = {
 type LedgerAudit = {
   id: number;
   ledger_entry_id: string;
-  action: "created" | "updated";
+  action: "created" | "updated" | "deleted";
   actor_name: string;
   changed_at: string;
   old_values: Record<string, unknown> | null;
@@ -78,6 +79,20 @@ export default function App() {
   const [receipt, setReceipt] = useState<File | null>(null);
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [editorName, setEditorName] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsUnlocked, setSettingsUnlocked] = useState(false);
+  const [settingsPassphrase, setSettingsPassphrase] = useState("");
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [deleteActorName, setDeleteActorName] = useState("");
+  const [backgroundImage, setBackgroundImage] = useState("");
+
+  useEffect(() => {
+    try {
+      setBackgroundImage(localStorage.getItem("community-ledger-background") ?? "");
+    } catch {
+      setBackgroundImage("");
+    }
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -248,6 +263,83 @@ export default function App() {
     setBusy(false);
   }
 
+  function unlockSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (settingsPassphrase !== "AKUMTT03") {
+      setSettingsMessage("Şifre hatalı. Tekrar deneyin.");
+      return;
+    }
+    setSettingsUnlocked(true);
+    setSettingsPassphrase("");
+    setSettingsMessage("");
+  }
+
+  function handleBackgroundChange(file: File | undefined) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setSettingsMessage("Arka plan için JPG, PNG veya WebP görseli seçin.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setSettingsMessage("Görsel en fazla 2 MB olabilir.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = String(reader.result ?? "");
+      try {
+        localStorage.setItem("community-ledger-background", image);
+        setBackgroundImage(image);
+        setSettingsMessage("Arka plan bu tarayıcıda kaydedildi.");
+      } catch {
+        setSettingsMessage("Görsel kaydedilemedi. Daha küçük bir görsel seçin.");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetBackground() {
+    localStorage.removeItem("community-ledger-background");
+    setBackgroundImage("");
+    setSettingsMessage("Varsayılan arka plan geri yüklendi.");
+  }
+
+  async function deleteAllEntries() {
+    if (!supabase || !canRecord) return;
+    const actorName = deleteActorName.trim();
+    if (!actorName) {
+      setSettingsMessage("Silme işlemini yapan kişinin adını yazın.");
+      return;
+    }
+    if (actorName.length > 80) {
+      setSettingsMessage("İsim en fazla 80 karakter olabilir.");
+      return;
+    }
+    if (entries.length === 0) {
+      setSettingsMessage("Silinecek kayıt yok.");
+      return;
+    }
+    if (!window.confirm(`${entries.length} kasa kaydı silinecek. İşlem geçmişinde kimin sildiği tutulacak. Devam edilsin mi?`)) return;
+    setBusy(true);
+    setSettingsMessage("");
+    const { data, error } = await supabase.rpc("delete_all_ledger_entries", { p_actor_name: actorName });
+    if (error) {
+      setBusy(false);
+      setSettingsMessage("Kayıtlar silinemedi. Sunucu şeması güncel olmayabilir; yöneticiyle iletişime geçin.");
+      return;
+    }
+    const receiptPaths = entries.flatMap((entry) => entry.receipt_path ? [entry.receipt_path] : []);
+    const { error: receiptError } = receiptPaths.length
+      ? await supabase.storage.from(RECEIPTS_BUCKET).remove(receiptPaths)
+      : { error: null };
+    setBusy(false);
+    setDeleteActorName("");
+    setSettingsMessage(receiptError
+      ? `${Number(data ?? 0)} kayıt silindi ve geçmişe eklendi; bazı fiş görselleri silinemedi.`
+      : `${Number(data ?? 0)} kayıt silindi ve işlem geçmişine eklendi.`);
+    setRefreshKey((value) => value + 1);
+  }
+
   function resetEntryForm() {
     setEditingEntry(null);
     setAmount("");
@@ -360,7 +452,7 @@ export default function App() {
   }
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" style={backgroundImage ? { "--user-background": `url("${backgroundImage}")` } as CSSProperties : undefined}>
       {!user ? (
         <section className="auth-card" aria-labelledby="page-title">
           <div className="mark" aria-hidden="true">₺</div>
@@ -398,7 +490,7 @@ export default function App() {
               <div className="mark small" aria-hidden="true">₺</div>
               <div><p className="eyebrow">TOPLULUK YÖNETİMİ</p><h1>Topluluk Bütçesi</h1></div>
             </div>
-            <div className="account-menu"><span title={user.email ?? undefined}>{user.email}</span><button className="text-button" onClick={handleSignOut} disabled={busy}>Çıkış</button></div>
+            <div className="account-menu"><span title={user.email ?? undefined}>{user.email}</span><button className="button settings-button" type="button" onClick={() => { setSettingsOpen(true); setSettingsUnlocked(false); setSettingsMessage(""); }}>Ayarlar</button><button className="button logout-button" onClick={handleSignOut} disabled={busy}>Çıkış</button></div>
           </header>
 
           {checkingAccess ? (
@@ -483,12 +575,24 @@ export default function App() {
                       const after = log.new_values ?? {};
                       const fields: Array<[string, string]> = [["entry_type", "Tür"], ["amount", "Tutar"], ["category", "Kategori"], ["entry_date", "Tarih"], ["note", "Açıklama"], ["receipt_path", "Fiş"]];
                       const changes = log.action === "created" ? `Yeni ${after.entry_type === "income" ? "gelir" : "gider"}: ${String(after.category ?? "")} · ${formatMoney(Number(after.amount ?? 0))}` : fields.filter(([key]) => before[key] !== after[key]).map(([key, label]) => `${label}: ${key === "amount" ? `${formatMoney(Number(before[key] ?? 0))} → ${formatMoney(Number(after[key] ?? 0))}` : key === "entry_type" ? `${before[key] === "income" ? "Gelir" : "Gider"} → ${after[key] === "income" ? "Gelir" : "Gider"}` : key === "receipt_path" ? `${before[key] ? "Değiştirildi" : "Yüklendi"}` : `${String(before[key] ?? "—")} → ${String(after[key] ?? "—")}`}`).join(" · ") || "Kayıt güncellendi";
-                      return <article className="audit-row" key={log.id}><span className={log.action === "created" ? "audit-dot created" : "audit-dot updated"} aria-hidden="true" /><div className="audit-detail"><strong>{log.actor_name} <span>{log.action === "created" ? "ekledi" : "düzenledi"}</span></strong><p>{changes}</p></div><time dateTime={log.changed_at}>{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(log.changed_at))}</time></article>;
+                      const actionLabel = log.action === "created" ? "ekledi" : log.action === "deleted" ? "sildi" : "düzenledi";
+                      const detail = log.action === "deleted" ? `Silinen kayıt: ${String(before.category ?? after.category ?? "")} · ${formatMoney(Number(before.amount ?? after.amount ?? 0))}` : changes;
+                      return <article className="audit-row" key={log.id}><span className={log.action === "created" ? "audit-dot created" : log.action === "deleted" ? "audit-dot deleted" : "audit-dot updated"} aria-hidden="true" /><div className="audit-detail"><strong>{log.actor_name} <span>{actionLabel}</span></strong><p>{detail}</p></div><time dateTime={log.changed_at}>{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(log.changed_at))}</time></article>;
                     })}
                   </div>
                 )}
               </section>
               <p className="privacy-note"><span aria-hidden="true">◈</span> Kasa kayıtları ve fiş görselleri yalnızca yetkilendirilmiş hesaplara açıktır.</p>
+              {settingsOpen && <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
+                <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+                  <div className="panel-heading"><div><p className="eyebrow">TERCİHLER VE YÖNETİM</p><h2 id="settings-title">Ayarlar</h2></div><button className="icon-button" type="button" aria-label="Ayarları kapat" onClick={() => setSettingsOpen(false)}>×</button></div>
+                  {!settingsUnlocked ? <form className="settings-form" onSubmit={unlockSettings}><p className="muted">Ayarları açmak için şifreyi girin.</p><label htmlFor="settings-password">Şifre</label><input id="settings-password" type="password" value={settingsPassphrase} onChange={(event) => setSettingsPassphrase(event.target.value)} autoComplete="current-password" required /><button className="button" type="submit">Ayarları aç</button></form> : <div className="settings-content">
+                    <section className="settings-section"><h3>Arka plan</h3><p>Yeni bir görsel seçin. Seçim bu tarayıcıda saklanır.</p><label className="button settings-action" htmlFor="background-file">Arka planı değiştir<input id="background-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => handleBackgroundChange(event.currentTarget.files?.[0])} /></label>{backgroundImage && <button className="button secondary settings-action" type="button" onClick={resetBackground}>Varsayılan arka plana dön</button>}</section>
+                    <section className="settings-section danger-zone"><h3>Kasa kayıtlarını sil</h3><p>Tüm gelir ve gider kayıtları silinir. İşlem geçmişinde silme işlemi ve yapan kişinin adı kalır.</p><label htmlFor="delete-actor-name">İşlemi yapan kişi</label><input id="delete-actor-name" value={deleteActorName} onChange={(event) => setDeleteActorName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" /><button className="button danger-button" type="button" onClick={deleteAllEntries} disabled={busy || entries.length === 0}>{busy ? "Siliniyor…" : `Tüm kayıtları sil (${entries.length})`}</button></section>
+                  </div>}
+                  {settingsMessage && <p className={settingsMessage.includes("silindi") || settingsMessage.includes("kaydedildi") || settingsMessage.includes("yüklendi") || settingsMessage.includes("geri yüklendi") ? "message success-message" : "message"} role="status">{settingsMessage}</p>}
+                </section>
+              </div>}
             </>
           )}
         </div>
