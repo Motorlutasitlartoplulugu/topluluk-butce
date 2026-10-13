@@ -71,6 +71,7 @@ export default function App() {
   const [auditMessage, setAuditMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [entryType, setEntryType] = useState<"income" | "expense">("expense");
+  const [mobileEntryOpen, setMobileEntryOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [enteredByName, setEnteredByName] = useState("");
@@ -417,6 +418,7 @@ export default function App() {
 
   function resetEntryForm() {
     setEditingEntry(null);
+    setMobileEntryOpen(false);
     setAmount("");
     setCategory("");
     setEnteredByName("");
@@ -430,6 +432,7 @@ export default function App() {
 
   function beginEdit(entry: LedgerEntry) {
     setEditingEntry(entry);
+    if (window.matchMedia("(max-width: 760px)").matches) setMobileEntryOpen(true);
     setEntryType(entry.entry_type);
     setAmount(String(entry.amount));
     setCategory(entry.category);
@@ -581,7 +584,12 @@ export default function App() {
             <>
               <section className="welcome-row">
                 <div><p className="eyebrow">ORTAK KASA</p><h2>Hesap hareketleri</h2><p className="muted">Gelirleri ve giderleri tek yerden takip edin.</p></div>
-                <div className="entry-count">{entries.length}<span> kayıt</span></div>
+                <div className="welcome-actions">
+                  <button className="mobile-entry-toggle" type="button" onClick={() => setMobileEntryOpen(true)} aria-label="Gelir veya gider kaydı aç">
+                    <span className="hamburger-icon" aria-hidden="true"><i /><i /><i /></span><span>Kayıt ekle</span>
+                  </button>
+                  <div className="entry-count">{entries.length}<span> kayıt</span></div>
+                </div>
               </section>
 
               <section className="summary-grid" aria-label="Bakiye özeti">
@@ -590,9 +598,10 @@ export default function App() {
                 <article className="summary-card expenses-card"><span>Masraflar</span><strong className="expense-text">{formatMoney(totals.expense)}</strong><small>Kaydedilen tüm masraflar</small></article>
               </section>
 
+              {mobileEntryOpen && <button className="mobile-entry-backdrop" type="button" aria-label="Kayıt formunu kapat" onClick={() => setMobileEntryOpen(false)} />}
               <div className="content-grid">
-                <section className="panel form-panel" aria-labelledby="entry-form-title">
-                  <div className="panel-heading"><div><p className="eyebrow">{editingEntry ? "KAYDI GÜNCELLE" : "YENİ HAREKET"}</p><h2 id="entry-form-title">{editingEntry ? "Kaydı düzenle" : "Kayıt ekle"}</h2></div><div className="plus-mark" aria-hidden="true">{editingEntry ? "↻" : "＋"}</div></div>
+                <section className={`panel form-panel${mobileEntryOpen ? " mobile-entry-open" : ""}`} aria-labelledby="entry-form-title">
+                  <div className="panel-heading"><div><p className="eyebrow">{editingEntry ? "KAYDI GÜNCELLE" : "YENİ HAREKET"}</p><h2 id="entry-form-title">{editingEntry ? "Kaydı düzenle" : "Kayıt ekle"}</h2></div><div className="form-heading-actions"><div className="plus-mark" aria-hidden="true">{editingEntry ? "↻" : "＋"}</div><button className="icon-button mobile-entry-close" type="button" aria-label="Kayıt formunu kapat" onClick={() => setMobileEntryOpen(false)}>×</button></div></div>
                   <form className="entry-form" onSubmit={handleCreateEntry}>
                     <fieldset className="type-switch">
                       <legend>Kayıt türü</legend>
