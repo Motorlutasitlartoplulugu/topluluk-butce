@@ -14,12 +14,23 @@ type LedgerEntry = {
   amount: number;
   category: string;
   entered_by_name: string | null;
+  updated_by_name?: string | null;
   note: string | null;
   entry_date: string;
   receipt_path: string | null;
   created_by: string;
   created_at: string;
   receipt_url?: string;
+};
+
+type LedgerAudit = {
+  id: number;
+  ledger_entry_id: string;
+  action: "created" | "updated";
+  actor_name: string;
+  changed_at: string;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown>;
 };
 
 function localDateValue() {
@@ -55,6 +66,8 @@ export default function App() {
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [canRecord, setCanRecord] = useState(false);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<LedgerAudit[]>([]);
+  const [auditMessage, setAuditMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [entryType, setEntryType] = useState<"income" | "expense">("expense");
   const [amount, setAmount] = useState("");
@@ -63,6 +76,8 @@ export default function App() {
   const [note, setNote] = useState("");
   const [entryDate, setEntryDate] = useState(localDateValue());
   const [receipt, setReceipt] = useState<File | null>(null);
+  const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
+  const [editorName, setEditorName] = useState("");
 
   useEffect(() => {
     if (!supabase) {
@@ -90,6 +105,7 @@ export default function App() {
     if (!supabase || !user) {
       setCanRecord(false);
       setEntries([]);
+      setAuditLogs([]);
       setCheckingAccess(false);
       return;
     }
@@ -151,6 +167,19 @@ export default function App() {
 
       if (cancelled) return;
       setEntries(withReceipts);
+      const { data: auditData, error: auditError } = await client
+        .from("ledger_entry_audit")
+        .select("id,ledger_entry_id,action,actor_name,changed_at,old_values,new_values")
+        .order("changed_at", { ascending: false })
+        .limit(40);
+      if (cancelled) return;
+      if (auditError) {
+        setAuditLogs([]);
+        setAuditMessage("İşlem geçmişi şu anda alınamıyor.");
+      } else {
+        setAuditLogs((auditData ?? []) as LedgerAudit[]);
+        setAuditMessage("");
+      }
       setCheckingAccess(false);
     }
 
@@ -219,6 +248,34 @@ export default function App() {
     setBusy(false);
   }
 
+  function resetEntryForm() {
+    setEditingEntry(null);
+    setAmount("");
+    setCategory("");
+    setEnteredByName("");
+    setEditorName("");
+    setNote("");
+    setEntryDate(localDateValue());
+    setReceipt(null);
+    const fileInput = document.getElementById("receipt") as HTMLInputElement | null;
+    if (fileInput) fileInput.value = "";
+  }
+
+  function beginEdit(entry: LedgerEntry) {
+    setEditingEntry(entry);
+    setEntryType(entry.entry_type);
+    setAmount(String(entry.amount));
+    setCategory(entry.category);
+    setEditorName("");
+    setNote(entry.note ?? "");
+    setEntryDate(entry.entry_date);
+    setReceipt(null);
+    setFormMessage("");
+    const fileInput = document.getElementById("receipt") as HTMLInputElement | null;
+    if (fileInput) fileInput.value = "";
+    document.getElementById("entry-form-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   async function handleCreateEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !user || !canRecord) return;
@@ -232,12 +289,13 @@ export default function App() {
       setFormMessage("Bir kategori yazın.");
       return;
     }
-    if (!enteredByName.trim()) {
-      setFormMessage("Kaydı ekleyen kişinin adını yazın.");
+    const attributionName = editingEntry ? editorName.trim() : enteredByName.trim();
+    if (!attributionName) {
+      setFormMessage(editingEntry ? "Düzenlemeyi yapan kişinin adını yazın." : "Kaydı ekleyen kişinin adını yazın.");
       return;
     }
-    if (enteredByName.trim().length > 80) {
-      setFormMessage("Kaydı ekleyen kişinin adı en fazla 80 karakter olabilir.");
+    if (attributionName.length > 80) {
+      setFormMessage("İsim en fazla 80 karakter olabilir.");
       return;
     }
     if (receipt && !RECEIPT_TYPES.includes(receipt.type)) {
@@ -251,7 +309,7 @@ export default function App() {
 
     setBusy(true);
     setFormMessage("");
-    let receiptPath: string | null = null;
+    let receiptPath: string | null = editingEntry?.receipt_path ?? null;
 
     if (receipt) {
       const extension = receipt.type === "image/jpeg" ? "jpg" : receipt.type.split("/")[1];
@@ -267,32 +325,36 @@ export default function App() {
       }
     }
 
-    const { error } = await supabase.from("ledger_entries").insert({
-      entry_type: entryType,
-      amount: numericAmount,
-      category: category.trim(),
-      entered_by_name: enteredByName.trim(),
-      note: note.trim() || null,
-      entry_date: entryDate,
-      receipt_path: receiptPath,
-      created_by: user.id,
-    });
+    const result = editingEntry
+      ? await supabase.from("ledger_entries").update({
+          entry_type: entryType,
+          amount: numericAmount,
+          category: category.trim(),
+          updated_by_name: attributionName,
+          note: note.trim() || null,
+          entry_date: entryDate,
+          receipt_path: receiptPath,
+        }).eq("id", editingEntry.id)
+      : await supabase.from("ledger_entries").insert({
+          entry_type: entryType,
+          amount: numericAmount,
+          category: category.trim(),
+          entered_by_name: attributionName,
+          note: note.trim() || null,
+          entry_date: entryDate,
+          receipt_path: receiptPath,
+          created_by: user.id,
+        });
 
-    if (error) {
-      setFormMessage("Kayıt eklenemedi. Hesap yetkinizi kontrol edin ve yeniden deneyin.");
+    if (result.error) {
+      setFormMessage(editingEntry ? "Düzenleme kaydedilemedi. Hesap yetkinizi kontrol edip yeniden deneyin." : "Kayıt eklenemedi. Hesap yetkinizi kontrol edin ve yeniden deneyin.");
       setBusy(false);
       return;
     }
 
-    setAmount("");
-    setCategory("");
-    setEnteredByName("");
-    setNote("");
-    setEntryDate(localDateValue());
-    setReceipt(null);
-    const fileInput = document.getElementById("receipt") as HTMLInputElement | null;
-    if (fileInput) fileInput.value = "";
-    setFormMessage("Kayıt eklendi.");
+    const wasEditing = Boolean(editingEntry);
+    resetEntryForm();
+    setFormMessage(wasEditing ? "Düzenleme kaydedildi ve geçmişe eklendi." : "Kayıt eklendi.");
     setRefreshKey((value) => value + 1);
     setBusy(false);
   }
@@ -362,8 +424,8 @@ export default function App() {
               </section>
 
               <div className="content-grid">
-                <section className="panel form-panel" aria-labelledby="new-entry-title">
-                  <div className="panel-heading"><div><p className="eyebrow">YENİ HAREKET</p><h2 id="new-entry-title">Kayıt ekle</h2></div><div className="plus-mark" aria-hidden="true">＋</div></div>
+                <section className="panel form-panel" aria-labelledby="entry-form-title">
+                  <div className="panel-heading"><div><p className="eyebrow">{editingEntry ? "KAYDI GÜNCELLE" : "YENİ HAREKET"}</p><h2 id="entry-form-title">{editingEntry ? "Kaydı düzenle" : "Kayıt ekle"}</h2></div><div className="plus-mark" aria-hidden="true">{editingEntry ? "↻" : "＋"}</div></div>
                   <form className="entry-form" onSubmit={handleCreateEntry}>
                     <fieldset className="type-switch">
                       <legend>Kayıt türü</legend>
@@ -374,20 +436,22 @@ export default function App() {
                     <div className="amount-field"><input id="amount" type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" required /><span>TRY</span></div>
                     <label htmlFor="category">Kategori</label>
                     <input id="category" value={category} onChange={(event) => setCategory(event.target.value)} maxLength={80} placeholder={entryType === "income" ? "Örn. bağış, aidat" : "Örn. ulaşım, malzeme"} required />
-                    <label htmlFor="entered-by-name">Kaydı ekleyen kişi</label>
-                    <input id="entered-by-name" value={enteredByName} onChange={(event) => setEnteredByName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" required />
+                    <label htmlFor={editingEntry ? "editor-name" : "entered-by-name"}>{editingEntry ? "Düzenlemeyi yapan kişi" : "Kaydı ekleyen kişi"}</label>
+                    <input id={editingEntry ? "editor-name" : "entered-by-name"} value={editingEntry ? editorName : enteredByName} onChange={(event) => editingEntry ? setEditorName(event.target.value) : setEnteredByName(event.target.value)} maxLength={80} placeholder="Ad soyad" autoComplete="name" required />
                     <label htmlFor="entry-date">Tarih</label>
                     <input id="entry-date" type="date" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} required />
                     <label htmlFor="note">Açıklama <span>İsteğe bağlı</span></label>
                     <textarea id="note" rows={3} maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Bu hareketle ilgili kısa bir not…" />
                     <label htmlFor="receipt">Fiş görseli <span>İsteğe bağlı</span></label>
+                    {editingEntry?.receipt_path && !receipt && <p className="receipt-preserved">Mevcut fiş korunacak. Yeni bir görsel seçerek değiştirebilirsiniz.</p>}
                     <label className="file-drop" htmlFor="receipt">
                       <span className="file-icon" aria-hidden="true">↑</span>
                       <span><strong>{receipt ? receipt.name : "Görsel seçin"}</strong><small>JPG, PNG veya WebP · en fazla 8 MB</small></span>
                       <input id="receipt" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setReceipt(event.currentTarget.files?.[0] ?? null)} />
                     </label>
                     {formMessage && <p className={formMessage === "Kayıt eklendi." ? "message success-message" : "message"} role="status">{formMessage}</p>}
-                    <button className="button submit-button" type="submit" disabled={busy}>{busy ? "Kaydediliyor…" : "Kaydı ekle"}</button>
+                    <button className="button submit-button" type="submit" disabled={busy}>{busy ? "Kaydediliyor…" : editingEntry ? "Değişiklikleri kaydet" : "Kaydı ekle"}</button>
+                    {editingEntry && <button className="button secondary cancel-edit-button" type="button" disabled={busy} onClick={() => { resetEntryForm(); setFormMessage(""); }}>Düzenlemeden vazgeç</button>}
                   </form>
                 </section>
 
@@ -402,13 +466,28 @@ export default function App() {
                         <article className="entry-row" key={entry.id}>
                           <div className={entry.entry_type === "income" ? "entry-symbol income-symbol" : "entry-symbol expense-symbol"} aria-hidden="true">{entry.entry_type === "income" ? "↙" : "↗"}</div>
                           <div className="entry-main"><strong>{entry.category}</strong><span>{formatDate(entry.entry_date)} · Ekleyen: {entry.entered_by_name || "Belirtilmemiş"}{entry.note ? ` · ${entry.note}` : ""}</span>{entry.receipt_path && (entry.receipt_url ? <a className="receipt-link" href={entry.receipt_url} target="_blank" rel="noreferrer">Fiş görselini aç ↗</a> : <small className="receipt-unavailable">Fiş görseli şu anda açılamıyor</small>)}</div>
-                          <strong className={entry.entry_type === "income" ? "entry-amount income-text" : "entry-amount expense-text"}>{entry.entry_type === "income" ? "+" : "−"}{formatMoney(Number(entry.amount))}</strong>
+                          <div className="entry-actions"><strong className={entry.entry_type === "income" ? "entry-amount income-text" : "entry-amount expense-text"}>{entry.entry_type === "income" ? "+" : "−"}{formatMoney(Number(entry.amount))}</strong><button className="edit-button" type="button" onClick={() => beginEdit(entry)} disabled={busy} aria-label={`${entry.category} kaydını düzenle`}>Düzenle</button></div>
                         </article>
                       ))}
                     </div>
                   )}
                 </section>
               </div>
+              <section className="panel audit-panel" aria-labelledby="audit-title">
+                <div className="panel-heading"><div><p className="eyebrow">KAYIT İZİ</p><h2 id="audit-title">İşlem geçmişi</h2></div><span className="secure-label"><span /> Son 40 işlem</span></div>
+                {auditMessage && <p className="message history-message" role="status">{auditMessage}</p>}
+                {!auditMessage && auditLogs.length === 0 ? <p className="audit-empty">Henüz kaydedilmiş işlem geçmişi yok. Bu tarihten sonra eklenen ve düzenlenen hareketler burada görünür.</p> : (
+                  <div className="audit-list">
+                    {auditLogs.map((log) => {
+                      const before = log.old_values ?? {};
+                      const after = log.new_values ?? {};
+                      const fields: Array<[string, string]> = [["entry_type", "Tür"], ["amount", "Tutar"], ["category", "Kategori"], ["entry_date", "Tarih"], ["note", "Açıklama"], ["receipt_path", "Fiş"]];
+                      const changes = log.action === "created" ? `Yeni ${after.entry_type === "income" ? "gelir" : "gider"}: ${String(after.category ?? "")} · ${formatMoney(Number(after.amount ?? 0))}` : fields.filter(([key]) => before[key] !== after[key]).map(([key, label]) => `${label}: ${key === "amount" ? `${formatMoney(Number(before[key] ?? 0))} → ${formatMoney(Number(after[key] ?? 0))}` : key === "entry_type" ? `${before[key] === "income" ? "Gelir" : "Gider"} → ${after[key] === "income" ? "Gelir" : "Gider"}` : key === "receipt_path" ? `${before[key] ? "Değiştirildi" : "Yüklendi"}` : `${String(before[key] ?? "—")} → ${String(after[key] ?? "—")}`}`).join(" · ") || "Kayıt güncellendi";
+                      return <article className="audit-row" key={log.id}><span className={log.action === "created" ? "audit-dot created" : "audit-dot updated"} aria-hidden="true" /><div className="audit-detail"><strong>{log.actor_name} <span>{log.action === "created" ? "ekledi" : "düzenledi"}</span></strong><p>{changes}</p></div><time dateTime={log.changed_at}>{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(log.changed_at))}</time></article>;
+                    })}
+                  </div>
+                )}
+              </section>
               <p className="privacy-note"><span aria-hidden="true">◈</span> Kasa kayıtları ve fiş görselleri yalnızca yetkilendirilmiş hesaplara açıktır.</p>
             </>
           )}
@@ -417,3 +496,4 @@ export default function App() {
     </main>
   );
 }
+
