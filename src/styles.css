@@ -165,8 +165,8 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
 .entry-main > span { display: block; margin-top: 4px; overflow: hidden; color: #8a948c; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .entry-amount { padding-left: 7px; font-family: "Manrope", sans-serif; font-size: 12px; white-space: nowrap; }
 .entry-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-.edit-button { padding: 6px 10px; border: 1px solid #14271f; border-radius: 8px; background: #243a31; color: #fff; font-size: 11px; font-weight: 750; box-shadow: 0 2px 4px rgba(18, 39, 29, .18); cursor: pointer; }
-.edit-button-icon { display: none; }
+.edit-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid #14271f; border-radius: 8px; background: #243a31; color: #fff; box-shadow: 0 2px 4px rgba(18, 39, 29, .18); cursor: pointer; }
+.edit-button-icon { display: block; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .edit-button:hover:not(:disabled) { border-color: #b9cbbd; background: #edf3ec; }
 .edit-button:disabled { opacity: .6; cursor: wait; }
 .edit-button:hover:not(:disabled) { border-color: #091a12; background: #14271f; box-shadow: 0 3px 7px rgba(18, 39, 29, .24); }
@@ -239,9 +239,7 @@ h1 { margin-bottom: 0; font-family: "Manrope", sans-serif; font-size: clamp(25px
   .account-actions .mobile-account-email { display: block; max-width: 100%; padding: 4px 5px 10px; border-bottom: 1px solid #e4e9e1; color: #55645a; font-size: 10px; }
   .account-actions .button { width: 100%; min-height: 38px; justify-content: flex-start; }
   .entry-actions { flex-direction: row; align-items: center; gap: 8px; }
-  .edit-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; }
   .edit-button-label { display: none; }
-  .edit-button-icon { display: block; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .history-panel { min-height: 320px; }
   .audit-panel { padding: 17px 15px; }
   .empty-state { padding: 58px 24px; }
